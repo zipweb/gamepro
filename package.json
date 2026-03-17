@@ -1,25 +1,12 @@
 {
-  "name": "lms-platform-monorepo",
+  "name": "gamepro-root",
   "private": true,
-  "version": "0.1.0",
-  "description": "Scalable LMS monorepo foundation (Next.js + Node.js + PostgreSQL + Prisma + Redis)",
   "workspaces": [
     "apps/*",
-    "packages/*",
-    "database"
+    "packages/*"
   ],
   "scripts": {
-    "dev": "npm --workspace @lms/backend run dev & npm --workspace @lms/frontend run dev",
-    "dev:frontend": "npm --workspace @lms/frontend run dev",
-    "dev:backend": "npm --workspace @lms/backend run dev",
-    "build": "npm run build -ws --if-present",
-    "lint": "npm run lint -ws --if-present",
-    "test": "npm run test -ws --if-present",
-    "db:generate": "npm --workspace @lms/database run prisma:generate",
-    "db:migrate": "npm --workspace @lms/database run prisma:migrate",
-    "db:studio": "npm --workspace @lms/database run prisma:studio"
-  },
-  "engines": {
-    "node": ">=20.0.0"
+    "start": "echo root",
+    "build": "echo root"
   }
 }
