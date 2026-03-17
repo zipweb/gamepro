@@ -1,0 +1,17 @@
+{
+  "name": "@lms/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node src/main.js",
+    "build": "echo 'build scaffold only'",
+    "start": "node src/main.js",
+    "lint": "echo 'lint scaffold only'",
+    "test": "echo 'test scaffold only'"
+  },
+  "dependencies": {
+    "@lms/config": "0.1.0",
+    "@lms/shared": "0.1.0"
+  }
+}
