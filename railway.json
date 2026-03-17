@@ -2,42 +2,32 @@
   "$schema": "https://railway.app/railway.schema.json",
   "services": [
     {
-      "name": "frontend",
-      "source": {
-        "repo": "https://github.com/nuvweb/lms-platform",
-        "branch": "main",
-        "rootDirectory": "apps/frontend"
-      },
-      "build": {
-        "command": "npm install && npm run build"
-      },
-      "start": {
-        "command": "npm run start -- -p $PORT -H 0.0.0.0"
-      },
-      "variables": {
-        "NEXT_PUBLIC_API_URL": "https://${{backend.RAILWAY_PUBLIC_DOMAIN}}"
-      }
-    },
-    {
       "name": "backend",
       "source": {
-        "repo": "https://github.com/nuvweb/lms-platform",
-        "branch": "main",
+        "repo": "https://github.com/zipweb/gamepro",
         "rootDirectory": "apps/backend"
       },
-      "build": {
-        "command": "npm install && npm run build"
-      },
-      "start": {
-        "command": "npm run start -- -p $PORT -H 0.0.0.0"
-      },
       "variables": {
-        "DATABASE_URL": "${{database.DATABASE_URL}}"
-      }
+        "PORT": "3000",
+        "JWT_SECRET": "supersecret",
+        "DATABASE_URL": "${{Postgres.DATABASE_URL}}"
+      },
+      "startCommand": "npm install && npm run build && npm run start"
     },
     {
-      "name": "database",
-      "plugin": "postgresql"
+      "name": "frontend",
+      "source": {
+        "repo": "https://github.com/zipweb/gamepro",
+        "rootDirectory": "apps/frontend"
+      },
+      "variables": {
+        "NEXT_PUBLIC_API_URL": "${{backend.RAILWAY_PUBLIC_DOMAIN}}"
+      },
+      "startCommand": "npm install && npm run build && npm start"
+    },
+    {
+      "name": "Postgres",
+      "plugin": "postgres"
     }
   ]
 }
