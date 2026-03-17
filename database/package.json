@@ -1,0 +1,10 @@
+{
+  "name": "@lms/database",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "prisma:generate": "echo 'prisma generate placeholder (requires prisma package)'",
+    "prisma:migrate": "echo 'prisma migrate placeholder (requires prisma package)'",
+    "prisma:studio": "echo 'prisma studio placeholder (requires prisma package)'"
+  }
+}

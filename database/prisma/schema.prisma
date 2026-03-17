@@ -1,0 +1,855 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  TRIAL
+  SUSPENDED
+  CANCELED
+}
+
+enum UserRole {
+  STUDENT
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+  DELETED
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  INSTRUCTOR
+  MODERATOR
+  STUDENT
+}
+
+enum CourseVisibility {
+  PRIVATE
+  PUBLIC
+  UNLISTED
+}
+
+enum TrackVisibility {
+  PRIVATE
+  PUBLIC
+}
+
+enum LessonType {
+  VIDEO
+  TEXT
+  QUIZ
+  LIVE
+}
+
+enum LocaleCode {
+  EN
+  ES
+  FR
+  PT_BR
+  PT_PT
+}
+
+enum EnrollmentSource {
+  MANUAL
+  SUBSCRIPTION
+  CHECKOUT
+  ADMIN_GRANT
+}
+
+enum CommunityAccessScope {
+  PUBLIC
+  PRIVATE
+  COURSE_BOUND
+}
+
+enum CommunityPostType {
+  TEXT
+  IMAGE
+}
+
+enum PlanInterval {
+  MONTH
+  YEAR
+  ONE_TIME
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  UNPAID
+}
+
+enum CheckoutMode {
+  PRODUCT
+  SUBSCRIPTION
+}
+
+enum CheckoutStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum NotificationType {
+  SYSTEM
+  COURSE
+  COMMUNITY
+  PAYMENT
+  ACHIEVEMENT
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  ARCHIVED
+}
+
+enum EmailStatus {
+  QUEUED
+  SENT
+  FAILED
+  BOUNCED
+}
+
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+  FATAL
+}
+
+enum ErrorSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum XPSourceType {
+  LESSON_COMPLETION
+  COURSE_COMPLETION
+  COMMUNITY_POST
+  COMMUNITY_COMMENT
+  ADMIN_ADJUSTMENT
+}
+
+model Tenant {
+  id            String       @id @default(uuid())
+  name          String
+  slug          String       @unique
+  status        TenantStatus @default(ACTIVE)
+  defaultLocale LocaleCode   @default(EN)
+  timezone      String       @default("UTC")
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  deletedAt     DateTime?
+
+  memberships            TenantMembership[]
+  courses                Course[]
+  communities            Community[]
+  plans                  Plan[]
+  tracks                 KnowledgeTrack[]
+  stripeCustomers        StripeCustomer[]
+  checkoutConfigurations CheckoutConfiguration[]
+  userDirectoryEntries   UserDirectoryEntry[]
+  emailTemplates         EmailTemplate[]
+  emailLogs              EmailLog[]
+  systemLogs             SystemLog[]
+  errorEvents            ErrorEvent[]
+  notifications          Notification[]
+  levelDefinitions       LevelDefinition[]
+  badges                 Badge[]
+  userLevels             UserLevel[]
+  userBadges             UserBadge[]
+  pointEvents            PointEvent[]
+  lessonProgress         LessonProgress[]
+  courseProgress         CourseProgress[]
+
+  @@index([status, deletedAt])
+}
+
+model User {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  passwordHash  String
+  password      String?
+  resetPasswordToken   String?
+  resetPasswordExpires DateTime?
+  resetPasswordUsedAt  DateTime?
+  status        UserStatus @default(ACTIVE)
+  globalRole    UserRole   @default(STUDENT)
+  name          String?
+  avatarUrl     String?
+  country       String?
+  language      LocaleCode @default(EN)
+  socialLinks   Json?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  deletedAt     DateTime?
+
+  memberships      TenantMembership[]
+  enrollments      Enrollment[]
+  subscriptions    Subscription[]
+  stripeCustomers  StripeCustomer[]
+  communityPosts   CommunityPost[]       @relation("CommunityPostAuthor")
+  communityComments CommunityComment[]   @relation("CommunityCommentAuthor")
+  postLikes        CommunityPostLike[]
+  commentLikes     CommunityCommentLike[]
+  lessonProgress   LessonProgress[]
+  courseProgress   CourseProgress[]
+  notifications    Notification[]
+  emailLogs        EmailLog[]
+  userBadges       UserBadge[]
+  userLevels       UserLevel[]
+  pointEvents      PointEvent[]
+  directoryEntries UserDirectoryEntry[]
+  refreshTokens    AuthRefreshToken[]
+
+  @@index([status, globalRole])
+  @@index([deletedAt])
+}
+
+model TenantMembership {
+  id        String         @id @default(uuid())
+  tenantId  String
+  userId    String
+  role      MembershipRole
+  joinedAt  DateTime       @default(now())
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  deletedAt DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([tenantId, userId])
+  @@index([tenantId, role, deletedAt])
+  @@index([userId, deletedAt])
+}
+
+model KnowledgeTrack {
+  id          String          @id @default(uuid())
+  tenantId    String
+  title       String
+  slug        String
+  description String?
+  visibility  TrackVisibility @default(PRIVATE)
+  position    Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  deletedAt   DateTime?
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  trackCourses TrackCourse[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, visibility, deletedAt])
+}
+
+model TrackCourse {
+  id        String   @id @default(uuid())
+  trackId   String
+  courseId  String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  track  KnowledgeTrack @relation(fields: [trackId], references: [id])
+  course Course         @relation(fields: [courseId], references: [id])
+
+  @@unique([trackId, courseId])
+  @@index([trackId, position])
+  @@index([courseId])
+}
+
+model Course {
+  id          String           @id @default(uuid())
+  tenantId    String
+  title       String
+  slug        String?
+  description String?
+  visibility  CourseVisibility @default(PRIVATE)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deletedAt   DateTime?
+
+  tenant         Tenant            @relation(fields: [tenantId], references: [id])
+  modules        CourseModule[]
+  enrollments    Enrollment[]
+  trackCourses   TrackCourse[]
+  communities    Community[]
+  courseProgress CourseProgress[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, visibility, deletedAt])
+}
+
+model CourseModule {
+  id        String   @id @default(uuid())
+  courseId  String
+  title     String
+  position  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  course  Course   @relation(fields: [courseId], references: [id])
+  lessons Lesson[]
+
+  @@index([courseId, position, deletedAt])
+}
+
+model Lesson {
+  id         String     @id @default(uuid())
+  moduleId   String
+  lessonType LessonType
+  position   Int
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  deletedAt  DateTime?
+
+  module         CourseModule         @relation(fields: [moduleId], references: [id])
+  localizations  LessonLocalization[]
+  lessonProgress LessonProgress[]
+
+  @@index([moduleId, position, deletedAt])
+}
+
+model LessonLocalization {
+  id            String     @id @default(uuid())
+  lessonId       String
+  locale         LocaleCode
+  title          String
+  contentJson    Json?
+  videoUrl       String?
+  subtitlesUrl   String?
+  durationSeconds Int?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  deletedAt      DateTime?
+
+  lesson Lesson @relation(fields: [lessonId], references: [id])
+
+  @@unique([lessonId, locale])
+  @@index([locale, deletedAt])
+}
+
+model Enrollment {
+  id        String           @id @default(uuid())
+  tenantId  String
+  courseId  String
+  userId    String
+  source    EnrollmentSource @default(MANUAL)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  deletedAt DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([courseId, userId])
+  @@index([tenantId, userId, deletedAt])
+  @@index([tenantId, courseId, deletedAt])
+}
+
+model LessonProgress {
+  id              String   @id @default(uuid())
+  tenantId        String
+  userId          String
+  lessonId        String
+  enrollmentId    String?
+  completed       Boolean  @default(false)
+  watchedSeconds  Int      @default(0)
+  completedAt     DateTime?
+  lastActivityAt  DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  user       User        @relation(fields: [userId], references: [id])
+  lesson     Lesson      @relation(fields: [lessonId], references: [id])
+  enrollment Enrollment? @relation(fields: [enrollmentId], references: [id])
+
+  @@unique([userId, lessonId])
+  @@index([tenantId, userId, completed])
+  @@index([tenantId, lessonId, completed])
+}
+
+model CourseProgress {
+  id                 String   @id @default(uuid())
+  tenantId           String
+  userId             String
+  courseId           String
+  enrollmentId       String?
+  completedLessons   Int      @default(0)
+  totalLessons       Int      @default(0)
+  progressPercentage Float    @default(0)
+  completedAt        DateTime?
+  lastActivityAt     DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  user       User        @relation(fields: [userId], references: [id])
+  course     Course      @relation(fields: [courseId], references: [id])
+  enrollment Enrollment? @relation(fields: [enrollmentId], references: [id])
+
+  @@unique([userId, courseId])
+  @@index([tenantId, userId, progressPercentage])
+  @@index([tenantId, courseId, progressPercentage])
+}
+
+model Community {
+  id          String               @id @default(uuid())
+  tenantId    String
+  courseId    String?
+  name        String
+  slug        String?
+  accessScope CommunityAccessScope @default(PRIVATE)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  deletedAt   DateTime?
+
+  tenant   Tenant             @relation(fields: [tenantId], references: [id])
+  course   Course?            @relation(fields: [courseId], references: [id])
+  posts    CommunityPost[]
+  comments CommunityComment[]
+  postLikes CommunityPostLike[]
+  commentLikes CommunityCommentLike[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, accessScope, deletedAt])
+  @@index([courseId])
+}
+
+model CommunityPost {
+  id           String   @id @default(uuid())
+  tenantId     String
+  communityId  String
+  authorUserId String
+  title        String
+  body         String
+  postType     CommunityPostType @default(TEXT)
+  imageUrl     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  tenant    Tenant             @relation(fields: [tenantId], references: [id])
+  community Community          @relation(fields: [communityId], references: [id])
+  author    User               @relation("CommunityPostAuthor", fields: [authorUserId], references: [id])
+  comments  CommunityComment[]
+  likes     CommunityPostLike[]
+
+  @@index([tenantId, communityId, createdAt])
+  @@index([authorUserId, createdAt])
+  @@index([deletedAt])
+}
+
+model CommunityComment {
+  id           String   @id @default(uuid())
+  tenantId     String
+  communityId  String
+  postId       String
+  authorUserId String
+  parentId     String?
+  body         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  tenant    Tenant             @relation(fields: [tenantId], references: [id])
+  community Community          @relation(fields: [communityId], references: [id])
+  post      CommunityPost      @relation(fields: [postId], references: [id])
+  author    User               @relation("CommunityCommentAuthor", fields: [authorUserId], references: [id])
+  parent    CommunityComment?  @relation("CommentThread", fields: [parentId], references: [id])
+  replies   CommunityComment[] @relation("CommentThread")
+  likes     CommunityCommentLike[]
+
+  @@index([tenantId, postId, createdAt])
+  @@index([authorUserId, createdAt])
+  @@index([parentId])
+  @@index([deletedAt])
+}
+
+
+model CommunityPostLike {
+  id           String   @id @default(uuid())
+  tenantId     String
+  communityId  String
+  postId       String
+  userId       String
+  createdAt    DateTime @default(now())
+
+  tenant    Tenant        @relation(fields: [tenantId], references: [id])
+  community Community     @relation(fields: [communityId], references: [id])
+  post      CommunityPost @relation(fields: [postId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
+
+  @@unique([postId, userId])
+  @@index([tenantId, communityId, createdAt])
+}
+
+model CommunityCommentLike {
+  id           String   @id @default(uuid())
+  tenantId     String
+  communityId  String
+  commentId    String
+  userId       String
+  createdAt    DateTime @default(now())
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id])
+  community Community        @relation(fields: [communityId], references: [id])
+  comment   CommunityComment @relation(fields: [commentId], references: [id])
+  user      User             @relation(fields: [userId], references: [id])
+
+  @@unique([commentId, userId])
+  @@index([tenantId, communityId, createdAt])
+}
+
+model UserDirectoryEntry {
+  id          String   @id @default(uuid())
+  tenantId    String
+  userId      String
+  headline    String?
+  bio         String?
+  isVisible   Boolean  @default(true)
+  searchable  Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([tenantId, userId])
+  @@index([tenantId, searchable, isVisible, deletedAt])
+}
+
+model Plan {
+  id            String       @id @default(uuid())
+  tenantId      String
+  stripePriceId String       @unique
+  name          String
+  interval      PlanInterval
+  amountCents   Int
+  currency      String
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  deletedAt     DateTime?
+
+  tenant                  Tenant                  @relation(fields: [tenantId], references: [id])
+  subscriptions           Subscription[]
+  checkoutConfigurations  CheckoutConfiguration[]
+
+  @@index([tenantId, interval, deletedAt])
+}
+
+model StripeCustomer {
+  id               String   @id @default(uuid())
+  tenantId         String
+  userId           String
+  stripeCustomerId String   @unique
+  isDefault        Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([tenantId, userId, stripeCustomerId])
+  @@index([tenantId, userId, isDefault])
+}
+
+model Subscription {
+  id                   String             @id @default(uuid())
+  tenantId             String
+  userId               String
+  planId               String
+  stripeSubscriptionId String             @unique
+  status               SubscriptionStatus
+  currentPeriodEnd     DateTime?
+  gracePeriodEndsAt    DateTime?
+  canceledAt           DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  deletedAt            DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  @@index([tenantId, userId, status, deletedAt])
+  @@index([status, currentPeriodEnd, gracePeriodEndsAt])
+}
+
+model CheckoutConfiguration {
+  id             String         @id @default(uuid())
+  tenantId       String
+  slug           String
+  mode           CheckoutMode
+  status         CheckoutStatus @default(DRAFT)
+  title          String
+  description    String?
+  successUrl     String
+  cancelUrl      String
+  planId         String?
+  productCourseId String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  deletedAt      DateTime?
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  plan    Plan?   @relation(fields: [planId], references: [id])
+  course  Course? @relation(fields: [productCourseId], references: [id])
+  sessions CheckoutSession[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, mode, status, deletedAt])
+}
+
+model CheckoutSession {
+  id                    String   @id @default(uuid())
+  tenantId              String
+  userId                String?
+  checkoutConfigurationId String
+  stripeCheckoutSessionId String  @unique
+  stripePaymentIntentId String?
+  stripeSubscriptionId  String?
+  amountCents           Int?
+  currency              String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  tenant                 Tenant                @relation(fields: [tenantId], references: [id])
+  user                   User?                 @relation(fields: [userId], references: [id])
+  checkoutConfiguration  CheckoutConfiguration @relation(fields: [checkoutConfigurationId], references: [id])
+
+  @@index([tenantId, userId, createdAt])
+  @@index([tenantId, checkoutConfigurationId, createdAt])
+}
+
+model LevelDefinition {
+  id          String   @id @default(uuid())
+  tenantId    String
+  level       Int
+  minXp       Int
+  title       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, level])
+  @@index([tenantId, minXp])
+}
+
+model UserLevel {
+  id        String   @id @default(uuid())
+  tenantId  String
+  userId    String
+  level     Int      @default(1)
+  totalXp   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([tenantId, userId])
+  @@index([tenantId, level, totalXp])
+}
+
+model Badge {
+  id          String   @id @default(uuid())
+  tenantId    String
+  key         String
+  name        String
+  description String?
+  iconUrl     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  userBadges UserBadge[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId, deletedAt])
+}
+
+model UserBadge {
+  id        String   @id @default(uuid())
+  tenantId  String
+  userId    String
+  badgeId   String
+  awardedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+  badge  Badge  @relation(fields: [badgeId], references: [id])
+
+  @@unique([userId, badgeId])
+  @@index([tenantId, userId, awardedAt])
+}
+
+model PointEvent {
+  id         String       @id @default(uuid())
+  tenantId   String
+  userId     String
+  sourceType XPSourceType
+  sourceId   String?
+  pointsDelta Int
+  metadata   Json?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, userId, createdAt])
+  @@index([tenantId, sourceType, createdAt])
+}
+
+model Notification {
+  id          String             @id @default(uuid())
+  tenantId    String
+  userId      String
+  type        NotificationType
+  status      NotificationStatus @default(UNREAD)
+  title       String
+  message     String
+  actionUrl   String?
+  payload     Json?
+  readAt      DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, userId, status, createdAt])
+}
+
+model EmailTemplate {
+  id          String   @id @default(uuid())
+  tenantId    String
+  key         String
+  locale      LocaleCode @default(EN)
+  subject     String
+  bodyHtml    String
+  bodyText    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  logs   EmailLog[]
+
+  @@unique([tenantId, key, locale])
+  @@index([tenantId, isActive, deletedAt])
+}
+
+model EmailLog {
+  id             String      @id @default(uuid())
+  tenantId       String
+  userId         String?
+  templateId     String?
+  toEmail        String
+  subject        String
+  status         EmailStatus @default(QUEUED)
+  providerMessageId String?
+  errorMessage   String?
+  metadata       Json?
+  sentAt         DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id])
+  user     User?          @relation(fields: [userId], references: [id])
+  template EmailTemplate? @relation(fields: [templateId], references: [id])
+
+  @@index([tenantId, status, createdAt])
+  @@index([toEmail, createdAt])
+}
+
+
+model AuthRefreshToken {
+  id          String   @id @default(uuid())
+  tenantId    String
+  userId      String
+  tokenHash   String   @unique
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, userId, revokedAt])
+  @@index([expiresAt])
+}
+
+model SystemLog {
+  id          String   @id @default(uuid())
+  tenantId    String?
+  level       LogLevel @default(INFO)
+  service     String
+  message     String
+  requestId   String?
+  traceId     String?
+  userId      String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, level, createdAt])
+  @@index([service, createdAt])
+  @@index([requestId])
+}
+
+model ErrorEvent {
+  id          String        @id @default(uuid())
+  tenantId    String?
+  severity    ErrorSeverity @default(MEDIUM)
+  service     String
+  fingerprint String
+  message     String
+  stacktrace  String?
+  context     Json?
+  firstSeenAt DateTime      @default(now())
+  lastSeenAt  DateTime      @default(now())
+  occurrences Int           @default(1)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, service, fingerprint])
+  @@index([severity, lastSeenAt])
+  @@index([service, lastSeenAt])
+}
