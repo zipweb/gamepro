@@ -1,9 +1,16 @@
-FROM node:20-alpine
+FROM node:18
+
 WORKDIR /app
 
 COPY . .
+
 RUN npm install
 
-WORKDIR /app/apps/backend
-EXPOSE 4000
-CMD ["npm", "run", "dev"]
+# Prisma apontando pro schema correto
+RUN npx prisma generate --schema=database/prisma/schema.prisma
+
+# Rodar migrations no banco Railway
+RUN npx prisma migrate deploy --schema=database/prisma/schema.prisma
+
+# Start backend
+CMD ["node", "apps/backend/src/main.js"]
