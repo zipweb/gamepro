@@ -1,0 +1,10 @@
+[phases.setup]
+cmds = ["npm install --legacy-peer-deps"]
+
+[phases.build]
+cmds = [
+  "cd apps/frontend && npm run build"
+]
+
+[start]
+cmd = "node apps/backend/src/main.js"
