@@ -4,10 +4,14 @@ WORKDIR /app
 
 COPY . .
 
+# instala tudo do monorepo
 RUN npm install --legacy-peer-deps
 
+# entra no frontend e instala deps dele também
 WORKDIR /app/apps/frontend
+RUN npm install --legacy-peer-deps
 
+# builda o frontend
 RUN npm run build
 
 EXPOSE 3000
