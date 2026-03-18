@@ -1,1 +1,3 @@
-export const moduleReady = true;
+import router from './routes.js';
+
+export default router;
