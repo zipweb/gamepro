@@ -1,0 +1,15 @@
+FROM node:18
+
+WORKDIR /app
+
+COPY . .
+
+RUN npm install --legacy-peer-deps
+
+WORKDIR /app/apps/frontend
+
+RUN npm run build
+
+EXPOSE 3000
+
+CMD ["npm", "start"]
